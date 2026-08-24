@@ -6,7 +6,7 @@ export type LockboxEntry = {
   key: string;
   namespace: LockboxNamespace;
   classification: LockboxClassification;
-  requiredBy: string[];
+  requiredBy: readonly string[];
   exposures: readonly LockboxExposure[];
 };
 

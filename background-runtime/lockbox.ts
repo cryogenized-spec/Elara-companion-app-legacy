@@ -1,3 +1,9 @@
+type KVNamespace = {
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  get<T = unknown>(key: string, type: 'json'): Promise<T | null>;
+  delete(key: string): Promise<void>;
+};
+
 export type CloudflareLockboxEnv = {
   GOOGLE_VAULT_KV: KVNamespace;
   GOOGLE_OAUTH_CLIENT_ID: string;

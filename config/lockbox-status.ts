@@ -8,6 +8,7 @@ export type LockboxStatusEntry = {
   classification: LockboxEntry['classification'];
   exposures: readonly string[];
   status: LockboxStatus;
+  configured: boolean;
 };
 
 export function evaluateLockboxStatus(
@@ -16,20 +17,24 @@ export function evaluateLockboxStatus(
   exposures: readonly string[] = [],
 ): LockboxStatusEntry[] {
   return entries
-    .filter((entry) => exposures.length === 0 || exposures.some((exposure) => entry.exposures.includes(exposure as never)))
-    .map((entry) => ({
-      key: entry.key,
-      namespace: entry.namespace,
-      classification: entry.classification,
-      exposures: entry.exposures,
-      status: typeof env[entry.key] === 'string' && Boolean((env[entry.key] as string).trim()) ? 'configured' : 'missing',
-    }));
+    .filter((entry) => exposures.length === 0 || exposures.some((exposure) => entry.exposures.includes(exposure as LockboxEntry['exposures'][number])))
+    .map((entry) => {
+      const configured = typeof env[entry.key] === 'string' && Boolean((env[entry.key] as string).trim());
+      return {
+        key: entry.key,
+        namespace: entry.namespace,
+        classification: entry.classification,
+        exposures: entry.exposures,
+        status: configured ? 'configured' : 'missing',
+        configured,
+      };
+    });
 }
 
 export function summarizeLockboxStatus(entries: readonly LockboxStatusEntry[]) {
   return {
     total: entries.length,
-    configured: entries.filter((entry) => entry.status === 'configured').length,
-    missing: entries.filter((entry) => entry.status === 'missing').length,
+    configured: entries.filter((entry) => entry.configured).length,
+    missing: entries.filter((entry) => !entry.configured).length,
   };
 }

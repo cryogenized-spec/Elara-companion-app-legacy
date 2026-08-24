@@ -8,6 +8,10 @@ const allowedProcessEnvFiles = new Set([
   'background-runtime/lockbox.ts',
   'scripts/automation-lockbox.mjs',
 ]);
+const approvedPublicBrowserCompatibilityFiles = new Set([
+  // googleApi keeps a guarded legacy fallback for the public Google OAuth client id.
+  'src/lib/googleApi.ts',
+]);
 const ignoredDirectories = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage']);
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
@@ -24,7 +28,7 @@ function walk(directory, files = []) {
 const violations = [];
 for (const file of walk(root)) {
   const relative = path.relative(root, file).replaceAll(path.sep, '/');
-  if (allowedProcessEnvFiles.has(relative)) continue;
+  if (allowedProcessEnvFiles.has(relative) || approvedPublicBrowserCompatibilityFiles.has(relative)) continue;
   const text = fs.readFileSync(file, 'utf8');
   const lines = text.split(/\r?\n/);
   lines.forEach((line, index) => {

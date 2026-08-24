@@ -4,9 +4,9 @@ import { LOCKBOX_MANIFEST, assertLockboxEntry } from '../../../config/lockbox';
 import { createServerLockbox } from '../../../server/services/lockbox';
 
 test('Lockbox identifies browser-safe and server-only entries correctly', () => {
-  assert.equal(assertLockboxEntry('VITE_GOOGLE_CLIENT_ID', { exposure: 'browser' }).classification, 'public');
-  assert.equal(assertLockboxEntry('GEMINI_API_KEY', { exposure: 'server' }).classification, 'secret');
-  assert.equal(assertLockboxEntry('CLOUDFLARE_API_TOKEN', { exposure: 'ci' }).classification, 'critical');
+  assert.equal(assertLockboxEntry('VITE_GOOGLE_CLIENT_ID', { exposures: ['browser'] }).classification, 'public');
+  assert.equal(assertLockboxEntry('GEMINI_API_KEY', { exposures: ['server'] }).classification, 'secret');
+  assert.equal(assertLockboxEntry('CLOUDFLARE_API_TOKEN', { exposures: ['ci'] }).classification, 'critical');
 });
 
 test('server Lockbox requires secrets and supports non-secret configuration', () => {

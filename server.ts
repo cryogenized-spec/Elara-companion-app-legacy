@@ -7,6 +7,7 @@ import { setupChatRoutes } from './server/routes/chat';
 import { setupMemoryRoutes } from './server/routes/memory';
 import { setupAudioRoutes } from './server/routes/audio';
 import { setupWorkspaceRoutes } from './server/routes/workspace';
+import { serverLockbox } from './server/services/lockbox';
 
 async function startServer() {
   const app = express();
@@ -34,7 +35,7 @@ async function startServer() {
   setupWorkspaceRoutes(app);
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
+  if (serverLockbox.config('NODE_ENV') !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

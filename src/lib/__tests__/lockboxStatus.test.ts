@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { evaluateLockboxStatus, summarizeLockboxStatus } from '../../../config/lockbox-status';
 
 const entries = [
-  { key: 'SECRET_A', namespace: 'app', classification: 'secret', requiredBy: ['server'], exposures: ['server'] },
-  { key: 'CONFIG_B', namespace: 'app', classification: 'config', requiredBy: ['server'], exposures: ['server'] },
+  { key: 'SECRET_A', namespace: 'app', classification: 'secret', requiredBy: ['server'] as const, exposures: ['server'] as const },
+  { key: 'CONFIG_B', namespace: 'app', classification: 'config', requiredBy: ['server'] as const, exposures: ['server'] as const },
 ] as const;
 
 test('Lockbox status reports only presence, never values', () => {
