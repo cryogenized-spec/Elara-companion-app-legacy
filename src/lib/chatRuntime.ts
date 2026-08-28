@@ -1,4 +1,3 @@
-import { HarmCategory, HarmBlockThreshold } from '@google/genai';
 import { Workspace } from '../types';
 import { getModelProfile } from './modelRegistry';
 import { agentToolDeclarations, executeAgentTool, AgentToolExecution } from './agentToolRegistry';
@@ -8,14 +7,13 @@ import { recordLiveToolActivity } from './thinkingLiveRuntime';
 
 export const MAX_AGENT_ITERATIONS = 5;
 
-/** Full BLOCK_NONE safety settings for every Gemini call. Never omit or override. */
-export const ELARA_SAFETY_SETTINGS = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_NONE },
-];
+/**
+ * Safety overrides are intentionally empty by default. Gemini 2.5/3 use the
+ * provider's default safety policy unless a specific feature opts into a
+ * per-request override. In particular, BLOCK_NONE is a restricted threshold
+ * for some accounts/projects and must not be forced on every request.
+ */
+export const ELARA_SAFETY_SETTINGS: any[] = [];
 
 export interface ChatHistoryMessage {
   role: string;
@@ -34,12 +32,12 @@ export interface RuntimeConfigOptions {
   topK?: number;
   thinkingBudget?: number;
   thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
-  /** @deprecated Always applied. Kept for type compatibility only. */
+  /** @deprecated Kept for compatibility; safety overrides are opt-in only. */
   includeSafetySettings?: boolean;
 }
 
 export function parseRuntimeDataUrl(value: string): { mimeType: string; data: string } | null {
-  const match = value.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+  const match = value.match(/^data:([a-zA-Z0-9]+\\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
   return match ? { mimeType: match[1], data: match[2] } : null;
 }
 
@@ -53,7 +51,7 @@ export function deriveThinkingLevel(explicitLevel: RuntimeConfigOptions['thinkin
 }
 
 export function normalizeModel(model: string, fallback = 'gemini-3.7-flash'): string {
-  return model.replace(/^models\//, '').trim() || fallback;
+  return model.replace(/^models\\//, '').trim() || fallback;
 }
 
 export function buildConversationContents(
@@ -93,7 +91,9 @@ export function buildRuntimeConfig(options: RuntimeConfigOptions): any {
   const combinedPrompt = [TEXT_PROCESSING_POLICY, options.systemPrompt || '', workspaceContext].filter(Boolean).join('\n\n').trim();
   if (combinedPrompt) config.systemInstruction = combinedPrompt;
 
-  config.safetySettings = ELARA_SAFETY_SETTINGS;
+  if (ELARA_SAFETY_SETTINGS.length > 0) {
+    config.safetySettings = ELARA_SAFETY_SETTINGS;
+  }
 
   if (profile.supportsTemperature && typeof options.temperature === 'number') {
     config.temperature = Math.min(profile.temperatureMax, Math.max(profile.temperatureMin, options.temperature));
