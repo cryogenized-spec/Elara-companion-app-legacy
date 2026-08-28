@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ignoredDirectories = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage']);
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.yml', '.yaml', '.md', '.env']);
+const allowedPublicConfigFiles = new Set([
+  // Firebase Web SDK config intentionally contains a client-side API key.
+  'firebase-applet-config.json',
+]);
 const patterns = [
   { name: 'Google API key', regex: /AIza[0-9A-Za-z_-]{30,}/g },
   { name: 'GitHub token', regex: /gh[pousr]_[A-Za-z0-9_]{20,}/g },
@@ -25,7 +29,7 @@ function walk(directory, files = []) {
 const findings = [];
 for (const file of walk(root)) {
   const relative = path.relative(root, file).replaceAll(path.sep, '/');
-  if (relative === '.env.example') continue;
+  if (relative === '.env.example' || allowedPublicConfigFiles.has(relative)) continue;
   const text = fs.readFileSync(file, 'utf8');
   for (const pattern of patterns) {
     if (pattern.regex.test(text)) findings.push(`${relative}: potential ${pattern.name} detected`);
