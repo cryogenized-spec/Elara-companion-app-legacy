@@ -94,6 +94,42 @@ function buildCompatibilityConfig(config: any): any {
   return compatibility;
 }
 
+function fingerprintConfig(config: any): Record<string, unknown> {
+  return {
+    configKeys: config && typeof config === 'object' ? Object.keys(config).sort() : [],
+    hasSystemInstruction: Boolean(config?.systemInstruction),
+    systemInstructionLength: typeof config?.systemInstruction === 'string' ? config.systemInstruction.length : 0,
+    safetySettingsCount: Array.isArray(config?.safetySettings) ? config.safetySettings.length : 0,
+    hasThinkingConfig: Boolean(config?.thinkingConfig),
+    thinkingConfigKeys: config?.thinkingConfig && typeof config.thinkingConfig === 'object' ? Object.keys(config.thinkingConfig).sort() : [],
+    hasTools: Array.isArray(config?.tools),
+    toolDeclarationCount: Array.isArray(config?.tools)
+      ? config.tools.reduce((total: number, tool: any) => total + (Array.isArray(tool?.functionDeclarations) ? tool.functionDeclarations.length : 0), 0)
+      : 0,
+    maxOutputTokens: typeof config?.maxOutputTokens === 'number' ? config.maxOutputTokens : null,
+    hasTemperature: typeof config?.temperature === 'number',
+    hasTopP: typeof config?.topP === 'number',
+    hasTopK: typeof config?.topK === 'number',
+  };
+}
+
+function emitGeminiForensics(stage: string, model: string, contents: any[], config: any, error?: unknown): void {
+  const classified = error ? classifyApiError(error, model) : undefined;
+  console.error(`[Gemini forensic] ${stage}`, {
+    model,
+    contentCount: Array.isArray(contents) ? contents.length : 0,
+    contentRoles: Array.isArray(contents) ? contents.map((item: any) => item?.role || 'unknown') : [],
+    ...fingerprintConfig(config),
+    ...(classified
+      ? {
+          errorCode: classified.code,
+          httpStatus: classified.httpStatus ?? null,
+          rawMessage: classified.rawMessage,
+        }
+      : {}),
+  });
+}
+
 export async function runResilientGeminiStreamTurn(
   options: ResilientStreamTurnOptions,
 ): Promise<ResilientStreamTurnResult> {
@@ -105,19 +141,22 @@ export async function runResilientGeminiStreamTurn(
       const functionCalls: any[] = [];
       const modelParts: any[] = [];
       let responseStream: any;
+      const requestConfig = options.buildConfig(model);
+      emitGeminiForensics('request', model, options.contents, requestConfig);
 
       try {
         responseStream = await options.ai.models.generateContentStream({
           model,
           contents: options.contents,
-          config: options.buildConfig(model),
+          config: requestConfig,
         });
       } catch (error) {
+        emitGeminiForensics('initial-request-failed', model, options.contents, requestConfig, error);
         const classified = classifyApiError(error, model);
-        const originalConfig = options.buildConfig(model);
-        const compatibilityConfig = buildCompatibilityConfig(originalConfig);
+        const compatibilityConfig = buildCompatibilityConfig(requestConfig);
 
         try {
+          emitGeminiForensics('compatibility-request', model, options.contents, compatibilityConfig);
           responseStream = await options.ai.models.generateContentStream({
             model,
             contents: options.contents,
@@ -129,6 +168,7 @@ export async function runResilientGeminiStreamTurn(
             status: classified.httpStatus,
           });
         } catch (compatibilityError) {
+          emitGeminiForensics('compatibility-request-failed', model, options.contents, compatibilityConfig, compatibilityError);
           const fallback = classifyApiError(compatibilityError, model);
           throw Object.assign(new Error(fallback.message), {
             apiError: {
@@ -177,6 +217,7 @@ export async function runResilientGeminiStreamTurn(
           }
         }
       } catch (error) {
+        emitGeminiForensics('stream-failed-after-start', model, options.contents, requestConfig, error);
         batcher.flush();
         if (emittedOutput) {
           const classified = classifyApiError(error, model);
