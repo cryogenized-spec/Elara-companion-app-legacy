@@ -9,6 +9,7 @@ import {
   recordModelSuccess,
   selectRuntimeModel,
 } from './modelHealth';
+import { recordRoutingEvent, type RoutingEvent } from './routingDiagnostics';
 
 export const DEFAULT_FALLBACK_MODELS = [
   'gemini-3.6-flash',
@@ -24,6 +25,7 @@ export interface ModelResiliencePolicy {
   autoRestorePreferredModel?: boolean;
   retryableErrorCodes?: string[];
   failoverErrorCodes?: string[];
+  telemetry?: (event: Omit<RoutingEvent, 'id' | 'timestamp' | 'timezone' | 'sessionId'>) => void;
 }
 
 export interface ModelResilienceContext {
@@ -75,6 +77,19 @@ function getErrorFromThrown(error: unknown, modelId: string): ClassifiedApiError
   return attached || classifyApiError(error, modelId);
 }
 
+function newRequestId(): string {
+  return `request_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function preferenceRank(model: string, preferredModel: string, fallbackModels: string[]): number | undefined {
+  const order = [preferredModel, ...fallbackModels]
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index);
+  const index = order.indexOf(model.trim().toLowerCase());
+  return index >= 0 ? index + 1 : undefined;
+}
+
 export function buildModelResiliencePolicy(settings?: ReliabilitySettings): ModelResiliencePolicy {
   if (!settings) {
     return {
@@ -113,8 +128,10 @@ export async function runWithModelResilience<T>(
   const failoverEnabled = options.failoverEnabled !== false;
   const cooldownMs = options.cooldownMs ?? DEFAULT_MODEL_COOLDOWN_MS;
   const attemptedModels = new Set<string>();
+  const requestId = newRequestId();
   let state = stateStore.get();
   const retryableCodes = options.retryableErrorCodes ? new Set(options.retryableErrorCodes) : undefined;
+  const telemetry = options.telemetry || ((event: Omit<RoutingEvent, 'id' | 'timestamp' | 'timezone' | 'sessionId'>) => recordRoutingEvent(event));
 
   while (true) {
     const selection = selectRuntimeModel({
@@ -132,16 +149,75 @@ export async function runWithModelResilience<T>(
     }
     attemptedModels.add(normalized);
 
+    const selectedRank = preferenceRank(selectedModel, preferredModel, fallbackModels);
+    const selectedStartedAt = Date.now();
+    telemetry({
+      requestId,
+      preferredModel,
+      attemptedModel: selectedModel,
+      preferenceRank: selectedRank,
+      attemptNumber: 1,
+      provider: 'gemini',
+      eventType: 'request',
+    });
+
     try {
       const result = await runWithRetry(
         async (attempt) => {
           try {
+            if (attempt > 1) {
+              telemetry({
+                requestId,
+                preferredModel,
+                attemptedModel: selectedModel,
+                preferenceRank: selectedRank,
+                attemptNumber: attempt,
+                provider: 'gemini',
+                eventType: 'retry',
+              });
+            }
             const turn = await executeTurn(selectedModel, attempt);
             state = recordModelSuccess(state, selectedModel);
             stateStore.set(state);
+            const latencyMs = Date.now() - selectedStartedAt;
+            telemetry({
+              requestId,
+              preferredModel,
+              attemptedModel: selectedModel,
+              preferenceRank: selectedRank,
+              attemptNumber: attempt,
+              provider: 'gemini',
+              eventType: 'success',
+              latencyMs,
+              success: true,
+            });
+            if (selection.probingPreferred) {
+              telemetry({
+                requestId,
+                preferredModel,
+                attemptedModel: selectedModel,
+                preferenceRank: selectedRank,
+                provider: 'gemini',
+                eventType: 'recovery',
+                success: true,
+              });
+            }
             return turn;
           } catch (error) {
             const classified = getErrorFromThrown(error, selectedModel);
+            telemetry({
+              requestId,
+              preferredModel,
+              attemptedModel: selectedModel,
+              preferenceRank: selectedRank,
+              attemptNumber: attempt,
+              provider: 'gemini',
+              eventType: 'error',
+              errorClassification: classified.code,
+              httpStatus: classified.httpStatus,
+              retryAfterMs: classified.retryAfterMs,
+              latencyMs: Date.now() - selectedStartedAt,
+            });
             if (retryableCodes && !retryableCodes.has(classified.code)) {
               throw Object.assign(new Error(classified.message), {
                 apiError: { ...classified, retryable: false },
@@ -170,6 +246,19 @@ export async function runWithModelResilience<T>(
       state = recordModelFailure(state, selectedModel, classified, Date.now(), cooldownMs);
       stateStore.set(state);
 
+      telemetry({
+        requestId,
+        preferredModel,
+        attemptedModel: selectedModel,
+        preferenceRank: selectedRank,
+        provider: 'gemini',
+        eventType: 'cooldown',
+        errorClassification: classified.code,
+        cooldownApplied: true,
+        cooldownUntil: Date.now() + Math.max(0, cooldownMs),
+        success: false,
+      });
+
       if (!failoverEnabled || !shouldFailOver(classified, options.failoverErrorCodes)) {
         throw error;
       }
@@ -184,6 +273,19 @@ export async function runWithModelResilience<T>(
       if (nextSelection.model.trim().toLowerCase() === normalized) {
         throw error;
       }
+
+      telemetry({
+        requestId,
+        preferredModel,
+        attemptedModel: selectedModel,
+        preferenceRank: selectedRank,
+        provider: 'gemini',
+        eventType: 'fallback',
+        errorClassification: classified.code,
+        fallbackEligible: true,
+        fallbackTaken: true,
+        destinationModel: nextSelection.model,
+      });
     }
   }
 }
