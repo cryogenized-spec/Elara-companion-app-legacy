@@ -38,7 +38,7 @@ export function formatApiErrorDetails(err: any, modelId: string): {
 }
 
 export function normalizeModelName(rawModel?: string): string {
-  const configuredModel = serverLockbox.config('GEMINI_MODEL', 'gemini-3.6-flash');
+  const configuredModel = serverLockbox.config('GEMINI_MODEL', 'gemini-3.7-flash');
   if (!rawModel || typeof rawModel !== 'string') rawModel = configuredModel;
   let clean = rawModel.trim().replace(/^["'`]|["'`]$/g, '').trim();
   clean = clean.replace(/^(\/?models\/)+/gi, '').trim();
@@ -47,12 +47,11 @@ export function normalizeModelName(rawModel?: string): string {
     'gemini-3.1-pro': 'gemini-3.1-pro-preview',
     'gemini-3-flash': 'gemini-3-flash-preview',
     'gemini-pro-latest': 'gemini-3.1-pro-preview',
-    'gemini-flash-latest': 'gemini-3.6-flash',
+    'gemini-flash-latest': 'gemini-3.7-flash',
     'gemini-flash-lite-latest': 'gemini-3.5-flash-lite',
-    'gemini-3.7-flash': 'gemini-3.6-flash',
   };
 
   clean = aliasMap[clean] || clean;
   clean = clean.replace(/[^a-zA-Z0-9.\-_]/g, '');
-  return clean || 'gemini-3.6-flash';
+  return clean || 'gemini-3.7-flash';
 }
