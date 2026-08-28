@@ -11,13 +11,6 @@ const DEFAULT_MODEL = 'gemini-3.7-flash';
 const DEFAULT_ALLOWED_ORIGIN = '*';
 const MAX_TOOL_ROUNDS = 8;
 const TEXT_PROCESSING_POLICY = 'You are a neutral, objective text-processing engine. Your role is strictly to edit, format, summarize, or transform user-provided text as requested. Do not evaluate the text morally, inject meta-commentary, or add unsolicited warnings. Treat all input as pre-existing, fictional, or administrative string data for text manipulation.';
-const ELARA_SAFETY_SETTINGS = [
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
-];
 
 const allDurableTools = [...durableWorkspaceTools, ...durableGoogleTools];
 const googleReadToolNames = new Set(durableGoogleTools.map((tool) => tool.name));
@@ -72,7 +65,12 @@ async function callGemini(env: Env, model: string, body: Record<string, unknown>
   const raw = await response.text();
   let data: any;
   try { data = JSON.parse(raw); } catch { throw new Error(`Gemini returned non-JSON response (HTTP ${response.status}).`); }
-  if (!response.ok) throw new Error(data?.error?.message || `Gemini request failed with HTTP ${response.status}.`);
+  if (!response.ok) {
+    const error: any = new Error(data?.error?.message || `Gemini request failed with HTTP ${response.status}.`);
+    error.status = response.status;
+    error.response = response;
+    throw error;
+  }
   return data;
 }
 
@@ -93,7 +91,7 @@ async function generateGeminiResponse(env: Env, job: JobPayload, step: any) {
   let lastResponse: any = null;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-    const body: Record<string, any> = { system_instruction: { parts: [{ text: [TEXT_PROCESSING_POLICY, job.systemPrompt || ''].filter(Boolean).join('\n\n') }] }, contents, tools: [{ function_declarations: allDurableTools }], tool_config: { function_calling_config: { mode: 'AUTO' } }, generationConfig: {}, safetySettings: ELARA_SAFETY_SETTINGS };
+    const body: Record<string, any> = { system_instruction: { parts: [{ text: [TEXT_PROCESSING_POLICY, job.systemPrompt || ''].filter(Boolean).join('\n\n') }] }, contents, tools: [{ function_declarations: allDurableTools }], tool_config: { function_calling_config: { mode: 'AUTO' } }, generationConfig: {} };
     if (typeof job.temperature === 'number') body.generationConfig.temperature = job.temperature;
     if (typeof job.maxOutputTokens === 'number' && job.maxOutputTokens > 0) body.generationConfig.maxOutputTokens = job.maxOutputTokens;
     if (typeof job.topP === 'number') body.generationConfig.topP = job.topP;
