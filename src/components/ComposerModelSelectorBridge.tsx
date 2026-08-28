@@ -6,20 +6,18 @@ import { ModelSelector } from './ModelSelector';
 
 /**
  * Pass 21 bridge: mounts the canonical model selector into the existing
- * composer footer without duplicating model/reliability state.
- *
- * The selected model is persisted before the app reloads so the existing
- * App state hydrates from the canonical settings store and the next request
- * uses the newly selected model immediately.
+ * composer footer without duplicating model or reliability state.
  */
 export const ComposerModelSelectorBridge: React.FC = () => {
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [settings, setSettings] = useState<ElaraSettings | null>(null);
+  const [streaming, setStreaming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    let observer: MutationObserver | null = null;
     let retryTimer: number | undefined;
+    let observer: MutationObserver | null = null;
+    let mount: HTMLDivElement | null = null;
 
     const attach = () => {
       if (cancelled) return;
@@ -30,21 +28,20 @@ export const ComposerModelSelectorBridge: React.FC = () => {
         return;
       }
 
-      const mount = document.createElement('div');
+      mount = document.createElement('div');
       mount.className = 'absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-[7.75rem] z-20 sm:right-[9.5rem]';
       mount.dataset.elaraModelSelectorMount = 'true';
       footer.appendChild(mount);
       setTarget(mount);
 
-      observer = new MutationObserver(() => {
-        if (!document.body.contains(footer)) {
-          observer?.disconnect();
-          observer = null;
-          setTarget(null);
-          retryTimer = window.setTimeout(attach, 250);
-        }
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
+      const refreshStreamingState = () => {
+        if (cancelled) return;
+        setStreaming(Boolean(footer.querySelector('button[title="Stop generation"]')));
+      };
+      refreshStreamingState();
+
+      observer = new MutationObserver(refreshStreamingState);
+      observer.observe(footer, { childList: true, subtree: true, attributes: true, attributeFilter: ['title', 'disabled'] });
     };
 
     attach();
@@ -59,6 +56,9 @@ export const ComposerModelSelectorBridge: React.FC = () => {
       cancelled = true;
       if (retryTimer) window.clearTimeout(retryTimer);
       observer?.disconnect();
+      observer = null;
+      if (mount?.parentNode) mount.parentNode.removeChild(mount);
+      mount = null;
       setTarget(null);
     };
   }, []);
@@ -69,13 +69,14 @@ export const ComposerModelSelectorBridge: React.FC = () => {
     <div className="w-[10rem] sm:w-[12rem]">
       <ModelSelector
         settings={settings}
-        disabled={false}
+        disabled={streaming}
         onUpdateSettings={(patch) => {
+          if (streaming) return;
           const next = { ...settings, ...patch };
           setSettings(next);
           void setDbSettings(next).then(() => {
             // App owns the live runtime settings state. Reload after persistence
-            // so its canonical state and the runtime model are updated together.
+            // so its canonical state and runtime model are updated together.
             window.location.reload();
           });
         }}
