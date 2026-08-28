@@ -7,6 +7,7 @@ import { setupChatRoutes } from './server/routes/chat';
 import { setupMemoryRoutes } from './server/routes/memory';
 import { setupAudioRoutes } from './server/routes/audio';
 import { setupWorkspaceRoutes } from './server/routes/workspace';
+import { setupModelDiagnosticsRoutes } from './server/routes/modelDiagnostics';
 
 async function startServer() {
   const app = express();
@@ -32,6 +33,7 @@ async function startServer() {
   setupMemoryRoutes(app);
   setupAudioRoutes(app);
   setupWorkspaceRoutes(app);
+  setupModelDiagnosticsRoutes(app);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
