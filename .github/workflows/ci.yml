@@ -42,3 +42,9 @@ jobs:
 
       - name: Production verification
         run: npm run verify:production
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser proving
+        run: npm run verify:browser
