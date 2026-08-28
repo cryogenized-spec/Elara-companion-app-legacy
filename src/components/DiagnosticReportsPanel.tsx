@@ -1,86 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Archive, FileText, Trash2, X, Sparkles } from 'lucide-react';
 import { AVAILABLE_MODELS } from '../types';
-import {
-  archiveDiagnosticReport,
-  deleteDiagnosticReport,
-  loadDiagnosticReports,
-  type DiagnosticReportRecord,
-} from '../lib/diagnosticReports';
+import { archiveDiagnosticReport, deleteDiagnosticReport, loadDiagnosticReports, type DiagnosticReportRecord } from '../lib/diagnosticReports';
 
-function label(model: string): string {
-  return AVAILABLE_MODELS.find((item) => item.id === model)?.name || model;
-}
-
-function formatDate(timestamp: number, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(timestamp));
-  } catch {
-    return new Date(timestamp).toLocaleString();
-  }
-}
+const label = (model: string) => AVAILABLE_MODELS.find((item) => item.id === model)?.name || model;
+const formatDate = (timestamp: number, timezone: string) => { try { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(timestamp)); } catch { return new Date(timestamp).toLocaleString(); } };
 
 export const DiagnosticReportsPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [reports, setReports] = useState<DiagnosticReportRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
   useEffect(() => { void loadDiagnosticReports().then(setReports); }, []);
-
-  const selected = useMemo(() => reports.find((report) => report.reportId === selectedId) || null, [reports, selectedId]);
-
-  const remove = async (reportId: string) => {
-    await deleteDiagnosticReport(reportId);
-    setReports((prev) => prev.filter((report) => report.reportId !== reportId));
-    setSelectedId((current) => current === reportId ? null : current);
-  };
-
+  const selected = useMemo(() => reports.find((r) => r.reportId === selectedId) || null, [reports, selectedId]);
+  const remove = async (reportId: string) => { await deleteDiagnosticReport(reportId); setReports((prev) => prev.filter((report) => report.reportId !== reportId)); if (selectedId === reportId) setSelectedId(null); };
   return (
     <div className="fixed inset-0 z-[90] flex h-[100dvh] w-full flex-col bg-[#09090b] text-zinc-100">
-      <header className="flex min-h-14 items-center justify-between gap-3 border-b border-zinc-800 bg-[#0d0d0f]/95 px-3 backdrop-blur-xl sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <button onClick={onBack} className="h-9 w-9 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100" aria-label="Back"><X className="mx-auto h-4 w-4" /></button>
-          <div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><Archive className="h-4 w-4 text-sky-400" /> Model Diagnostics / Reports</div><div className="text-[10px] text-zinc-500">Dedicated archive for model-routing analysis reports</div></div>
-        </div>
-        <div className="text-[10px] text-zinc-600">{reports.length} {reports.length === 1 ? 'report' : 'reports'}</div>
-      </header>
-
-      <main className="min-h-0 flex-1 overflow-hidden p-3 sm:p-5">
-        <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(18rem,25rem)_1fr]">
-          <section className="min-h-0 overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950/40">
-            {reports.length === 0 ? (
-              <div className="flex min-h-64 items-center justify-center p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-zinc-700" /><p className="mt-3 text-sm text-zinc-500">No diagnostic reports archived yet.</p><p className="mt-1 text-[11px] text-zinc-700">Generate a report from Model behaviour analysis and it will appear here.</p></div></div>
-            ) : (
-              <div className="divide-y divide-zinc-900">{reports.map((report) => (
-                <button key={report.reportId} type="button" onClick={() => setSelectedId(report.reportId)} className={`block w-full p-4 text-left hover:bg-zinc-900/50 ${selectedId === report.reportId ? 'bg-sky-950/10' : ''}`}>
-                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-zinc-200">{report.title}</div><div className="mt-1 text-[10px] text-zinc-600">{formatDate(report.generatedAt, report.timezone)}</div></div><Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-400" /></div>
-                  <div className="mt-2 text-[10px] text-zinc-500">Written by {report.writtenByDisplayName}</div>
-                  <div className="mt-1 truncate text-[10px] text-zinc-600">Analysed: {report.modelsAnalysed.map(label).join(' · ')}</div>
-                  <div className="mt-1 text-[10px] text-zinc-700">{report.analysisPeriod.label} · {report.onlineResearchPerformed ? 'online check' : 'local telemetry'}</div>
-                </button>
-              ))}</div>
-            )}
-          </section>
-
-          <section className="min-h-0 overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950/20 p-4 sm:p-5">
-            {selected ? (
-              <>
-                <div className="flex items-start justify-between gap-4 border-b border-zinc-900 pb-4">
-                  <div><h1 className="text-base font-semibold text-zinc-100">{selected.title}</h1><div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-zinc-600"><span>Written by {selected.writtenByDisplayName} <span aria-hidden="true">✦</span></span><span>{formatDate(selected.generatedAt, selected.timezone)} {selected.timezone}</span></div></div>
-                  <button type="button" onClick={() => void remove(selected.reportId)} className="rounded-lg p-2 text-zinc-600 hover:bg-red-950/30 hover:text-red-300" aria-label="Delete report"><Trash2 className="h-4 w-4" /></button>
-                </div>
-                <div className="mt-4 text-sm leading-7 text-zinc-300 whitespace-pre-wrap">{selected.reportMarkdown}</div>
-                <div className="mt-6 border-t border-zinc-900 pt-4 text-[10px] text-zinc-600">
-                  <p>Analysed models: {selected.modelsAnalysed.map(label).join(', ')}</p>
-                  <p className="mt-1">Source snapshot: {selected.sourceSnapshotId}</p>
-                  <p className="mt-1">Report type: {selected.reportType}</p>
-                  <p className="mt-1">Online research: {selected.onlineResearchPerformed ? 'performed' : 'not performed'}</p>
-                  <button type="button" onClick={() => void archiveDiagnosticReport(selected.reportId)} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[10px] text-zinc-500 hover:text-zinc-300"><Archive className="h-3 w-3" /> Keep archived</button>
-                </div>
-              </>
-            ) : <div className="flex h-full min-h-64 items-center justify-center text-sm text-zinc-700">Select a report to read it.</div>}
-          </section>
-        </div>
-      </main>
+      <header className="flex min-h-14 items-center justify-between border-b border-zinc-800 bg-[#0d0d0f]/95 px-3 backdrop-blur-xl sm:px-5"><div className="flex min-w-0 items-center gap-3"><button onClick={onBack} className="h-9 w-9 rounded-lg text-zinc-400 hover:bg-zinc-800" aria-label="Back"><X className="mx-auto h-4 w-4" /></button><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-semibold"><Archive className="h-4 w-4 text-sky-400" /> Model Diagnostics / Reports</div><div className="text-[10px] text-zinc-500">Dedicated archive for model-routing analysis</div></div></div><span className="text-[10px] text-zinc-600">{reports.length} {reports.length === 1 ? 'report' : 'reports'}</span></header>
+      <main className="min-h-0 flex-1 overflow-hidden p-3 sm:p-5"><div className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(18rem,25rem)_1fr]">
+        <section className="min-h-0 overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950/40">{reports.length ? <div className="divide-y divide-zinc-900">{reports.map((report) => <button key={report.reportId} type="button" onClick={() => setSelectedId(report.reportId)} className={`block w-full p-4 text-left hover:bg-zinc-900/50 ${selectedId === report.reportId ? 'bg-sky-950/10' : ''}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="truncate text-xs font-semibold text-zinc-200">{report.title}</div><div className="mt-1 text-[10px] text-zinc-600">{formatDate(report.generatedAt, report.timezone)}</div></div><span aria-hidden="true" className="text-sm text-sky-400">✦</span></div><div className="mt-2 text-[10px] text-zinc-500">Written by {report.writtenByDisplayName} <span aria-hidden="true">✦</span></div><div className="mt-1 truncate text-[10px] text-zinc-600">Analysed: {report.modelsAnalysed.map(label).join(' · ')}</div><div className="mt-1 text-[10px] text-zinc-700">{report.analysisPeriod.label} · {report.onlineResearchPerformed ? 'online check' : 'local telemetry'}</div></button>)}</div> : <div className="flex min-h-64 items-center justify-center p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-zinc-700" /><p className="mt-3 text-sm text-zinc-500">No diagnostic reports archived yet.</p><p className="mt-1 text-[11px] text-zinc-700">Generate a report from Model behaviour analysis and it will appear here.</p></div></div>}</section>
+        <section className="min-h-0 overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950/20 p-4 sm:p-5">{selected ? <><div className="flex items-start justify-between gap-4 border-b border-zinc-900 pb-4"><div><h1 className="text-base font-semibold text-zinc-100">{selected.title}</h1><div className="mt-2 flex flex-wrap gap-3 text-[10px] text-zinc-600"><span>Written by {selected.writtenByDisplayName} <span aria-hidden="true">✦</span></span><span>{formatDate(selected.generatedAt, selected.timezone)} {selected.timezone}</span></div></div><button type="button" onClick={() => void remove(selected.reportId)} className="rounded-lg p-2 text-zinc-600 hover:bg-red-950/30 hover:text-red-300" aria-label="Delete report"><Trash2 className="h-4 w-4" /></button></div><div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-zinc-300">{selected.reportMarkdown}</div><div className="mt-6 border-t border-zinc-900 pt-4 text-[10px] text-zinc-600"><p>Analysed models: {selected.modelsAnalysed.map(label).join(', ')}</p><p className="mt-1">Source snapshot: {selected.sourceSnapshotId}</p><p className="mt-1">Report type: {selected.reportType}</p><p className="mt-1">Online research: {selected.onlineResearchPerformed ? 'performed' : 'not performed'}</p><button type="button" onClick={() => void archiveDiagnosticReport(selected.reportId)} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 px-2.5 py-1.5 text-[10px] text-zinc-500 hover:text-zinc-300"><Archive className="h-3 w-3" /> Keep archived</button></div></> : <div className="flex h-full min-h-64 items-center justify-center text-sm text-zinc-700">Select a report to read it.</div>}</section>
+      </div></main>
     </div>
   );
 };
