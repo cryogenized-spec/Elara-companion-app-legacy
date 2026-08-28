@@ -17,7 +17,8 @@
     "lint": "npm run lockbox:validate && npm run lockbox:audit && npm run lockbox:secrets && tsc --noEmit && npm --prefix background-runtime install --no-audit --no-fund && npm --prefix background-runtime run typecheck",
     "test": "node --import tsx --test",
     "benchmark:memory": "tsx scripts/benchmark-memory-consolidation.ts",
-    "verify:production": "node scripts/verify-production.mjs"
+    "verify:production": "node scripts/verify-production.mjs",
+    "verify:browser": "node scripts/verify-browser.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.15.0",
@@ -31,6 +32,7 @@
     "lucide-react": "^0.546.0",
     "mermaid": "^11.16.1",
     "motion": "^12.23.24",
+    "playwright": "^1.55.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-markdown": "^10.1.0",
