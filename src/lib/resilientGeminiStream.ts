@@ -86,6 +86,14 @@ function createChunkBatcher(onChunk: (chunk: StreamChunk) => void) {
   return { enqueue, flush };
 }
 
+function buildCompatibilityConfig(config: any): any {
+  if (!config || typeof config !== 'object') return config;
+  const compatibility = { ...config };
+  delete compatibility.tools;
+  delete compatibility.thinkingConfig;
+  return compatibility;
+}
+
 export async function runResilientGeminiStreamTurn(
   options: ResilientStreamTurnOptions,
 ): Promise<ResilientStreamTurnResult> {
@@ -96,11 +104,41 @@ export async function runResilientGeminiStreamTurn(
       let emittedOutput = false;
       const functionCalls: any[] = [];
       const modelParts: any[] = [];
-      const responseStream = await options.ai.models.generateContentStream({
-        model,
-        contents: options.contents,
-        config: options.buildConfig(model),
-      });
+      let responseStream: any;
+
+      try {
+        responseStream = await options.ai.models.generateContentStream({
+          model,
+          contents: options.contents,
+          config: options.buildConfig(model),
+        });
+      } catch (error) {
+        const classified = classifyApiError(error, model);
+        const originalConfig = options.buildConfig(model);
+        const compatibilityConfig = buildCompatibilityConfig(originalConfig);
+
+        try {
+          responseStream = await options.ai.models.generateContentStream({
+            model,
+            contents: options.contents,
+            config: compatibilityConfig,
+          });
+          console.warn('Gemini request used compatibility envelope after initial request failure.', {
+            model,
+            code: classified.code,
+            status: classified.httpStatus,
+          });
+        } catch (compatibilityError) {
+          const fallback = classifyApiError(compatibilityError, model);
+          throw Object.assign(new Error(fallback.message), {
+            apiError: {
+              ...fallback,
+              rawMessage: `Initial request: ${classified.rawMessage} | Compatibility request: ${fallback.rawMessage}`,
+            },
+          });
+        }
+      }
+
       const batcher = createChunkBatcher(options.onChunk);
 
       try {
