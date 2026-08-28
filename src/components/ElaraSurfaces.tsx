@@ -1,61 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Cloud, CloudCog, Grid2X2, X, BookOpen, Layers3 } from 'lucide-react';
+import { Cloud, CloudCog, Grid2X2, X, BookOpen, Layers3, FileBarChart2 } from 'lucide-react';
 import { ArtifactsPanel } from './ArtifactsPanel';
 import { GoogleCapabilitySettingsPanel } from './GoogleCapabilitySettingsPanel';
 import { DurableBackgroundPanel } from './DurableBackgroundPanel';
 import { ScratchpadPanel } from './ScratchpadPanel';
+import { DiagnosticReportsPanel } from './DiagnosticReportsPanel';
 import { WorkspaceArtifact } from '../types';
 
 export const ElaraSurfaces: React.FC = () => {
-  const [surface, setSurface] = useState<'artifacts' | 'google' | 'scratchpad' | 'background' | null>(null);
+  const [surface, setSurface] = useState<'artifacts' | 'google' | 'scratchpad' | 'background' | 'reports' | null>(null);
   const [artifactNotice, setArtifactNotice] = useState<WorkspaceArtifact | null>(null);
-
-  useEffect(() => {
-    let timer: number | undefined;
-    const handleArtifact = (event: Event) => {
-      const detail = (event as CustomEvent<{ artifact?: WorkspaceArtifact; action?: 'created' | 'updated' }>).detail;
-      if (!detail?.artifact || detail.action !== 'created') return;
-      setArtifactNotice(detail.artifact);
-      if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => setArtifactNotice(null), 7500);
-    };
-    window.addEventListener('elara:artifact-created', handleArtifact);
-    return () => {
-      window.removeEventListener('elara:artifact-created', handleArtifact);
-      if (timer) window.clearTimeout(timer);
-    };
-  }, []);
-
-  return (
-    <>
-      {artifactNotice && (
-        <div className="fixed left-3 right-3 top-3 z-[95] mx-auto max-w-xl rounded-2xl border border-violet-500/20 bg-[#111114]/95 px-4 py-3 shadow-2xl backdrop-blur-xl sm:left-auto sm:right-5 sm:w-[26rem]">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><Grid2X2 className="h-4 w-4" /></div>
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-zinc-100">Elara created an artifact</div>
-              <div className="mt-0.5 truncate text-[11px] text-zinc-400">{artifactNotice.name}</div>
-              <button onClick={() => { setSurface('artifacts'); setArtifactNotice(null); }} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-500"><Grid2X2 className="h-3.5 w-3.5" /> View in Artifacts</button>
-            </div>
-            <button onClick={() => setArtifactNotice(null)} className="h-7 w-7 rounded-lg text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300" aria-label="Dismiss">×</button>
-          </div>
-        </div>
-      )}
-
-      <div data-elara-surface-strip className="fixed bottom-4 right-4 z-30 flex max-w-[calc(100vw-2rem)] items-center gap-2 overflow-x-auto sm:bottom-5 sm:right-5">
-        <button type="button" className="mobile-surfaces-trigger inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 shadow-2xl shadow-black/30 backdrop-blur-xl" onClick={() => setSurface(surface ? null : 'artifacts')} title="Open Elara surfaces"><Layers3 className="h-4 w-4 text-violet-400" /> Surfaces</button>
-        <div className="desktop-surface-actions flex items-center gap-2">
-          <button onClick={() => setSurface('artifacts')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 shadow-2xl shadow-black/30 backdrop-blur-xl hover:border-violet-500/40 hover:text-white" title="Artifacts"><Grid2X2 className="h-4 w-4 text-violet-400" /> Artifacts</button>
-          <button onClick={() => setSurface('scratchpad')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 shadow-2xl shadow-black/30 backdrop-blur-xl hover:border-amber-500/40 hover:text-white" title="Scratchpad"><BookOpen className="h-4 w-4 text-amber-400" /> Scratchpad</button>
-          <button onClick={() => setSurface('google')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 shadow-2xl shadow-black/30 backdrop-blur-xl hover:border-sky-500/40 hover:text-white" title="Google Workspace"><Cloud className="h-4 w-4 text-sky-400" /> Google</button>
-          <button onClick={() => setSurface('background')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 shadow-2xl shadow-black/30 backdrop-blur-xl hover:border-violet-500/40 hover:text-white" title="Durable background runtime"><CloudCog className="h-4 w-4 text-violet-400" /> Background</button>
-        </div>
-      </div>
-
-      {surface === 'artifacts' && <ArtifactsPanel onBack={() => setSurface(null)} />}
-      {surface === 'scratchpad' && <ScratchpadPanel onBack={() => setSurface(null)} />}
-      {surface === 'background' && <div className="fixed inset-0 z-30 flex h-[100dvh] w-full flex-col bg-[#09090b] text-zinc-100"><header className="flex min-h-14 items-center gap-3 border-b border-zinc-800 bg-[#0d0d0f]/95 px-3 backdrop-blur-xl"><button onClick={() => setSurface(null)} className="h-9 w-9 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">←</button><div><div className="text-sm font-semibold">Background runtime</div><div className="text-[10px] text-zinc-500">Continue supported work after the page closes</div></div></header><main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"><DurableBackgroundPanel /></main></div>}
-      {surface === 'google' && <div className="fixed inset-0 z-30 flex h-[100dvh] w-full flex-col bg-[#09090b] text-zinc-100"><header className="flex min-h-14 items-center gap-3 border-b border-zinc-800 bg-[#0d0d0f]/95 px-3 backdrop-blur-xl"><button onClick={() => setSurface(null)} className="h-9 w-9 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100" title="Close"><X className="mx-auto h-4 w-4" /></button><div><div className="text-sm font-semibold">Google Workspace</div><div className="text-[10px] text-zinc-500">Identity and least-privilege capability permissions</div></div></header><main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"><GoogleCapabilitySettingsPanel /></main></div>}
-    </>
-  );
+  useEffect(() => { let timer:number|undefined; const handleArtifact=(event:Event)=>{const detail=(event as CustomEvent<{artifact?:WorkspaceArtifact;action?:'created'|'updated'}>).detail;if(!detail?.artifact||detail.action!=='created')return;setArtifactNotice(detail.artifact);if(timer)window.clearTimeout(timer);timer=window.setTimeout(()=>setArtifactNotice(null),7500);};window.addEventListener('elara:artifact-created',handleArtifact);return()=>{window.removeEventListener('elara:artifact-created',handleArtifact);if(timer)window.clearTimeout(timer);};},[]);
+  return <>
+    {artifactNotice && <div className="fixed left-3 right-3 top-3 z-[95] mx-auto max-w-xl rounded-2xl border border-violet-500/20 bg-[#111114]/95 px-4 py-3 shadow-2xl backdrop-blur-xl sm:left-auto sm:right-5 sm:w-[26rem]"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><Grid2X2 className="h-4 w-4"/></div><div className="min-w-0 flex-1"><div className="text-xs font-semibold text-zinc-100">Elara created an artifact</div><div className="mt-0.5 truncate text-[11px] text-zinc-400">{artifactNotice.name}</div><button onClick={()=>{setSurface('artifacts');setArtifactNotice(null);}} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-500"><Grid2X2 className="h-3.5 w-3.5"/> View in Artifacts</button></div><button onClick={()=>setArtifactNotice(null)} className="h-7 w-7 rounded-lg text-zinc-600 hover:bg-zinc-800" aria-label="Dismiss">×</button></div></div>}
+    <div data-elara-surface-strip className="fixed bottom-4 right-4 z-30 flex max-w-[calc(100vw-2rem)] items-center gap-2 overflow-x-auto sm:bottom-5 sm:right-5"><button type="button" className="mobile-surfaces-trigger inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 shadow-2xl shadow-black/30 backdrop-blur-xl" onClick={()=>setSurface(surface?null:'artifacts')} title="Open Elara surfaces"><Layers3 className="h-4 w-4 text-violet-400"/> Surfaces</button><div className="desktop-surface-actions flex items-center gap-2"><button onClick={()=>setSurface('artifacts')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 hover:border-violet-500/40" title="Artifacts"><Grid2X2 className="h-4 w-4 text-violet-400"/> Artifacts</button><button onClick={()=>setSurface('scratchpad')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 hover:border-amber-500/40" title="Scratchpad"><BookOpen className="h-4 w-4 text-amber-400"/> Scratchpad</button><button onClick={()=>setSurface('reports')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 hover:border-sky-500/40" title="Model Diagnostics / Reports"><FileBarChart2 className="h-4 w-4 text-sky-400"/> Model Reports</button><button onClick={()=>setSurface('google')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 hover:border-sky-500/40" title="Google Workspace"><Cloud className="h-4 w-4 text-sky-400"/> Google</button><button onClick={()=>setSurface('background')} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950/95 px-4 text-xs font-semibold text-zinc-200 hover:border-violet-500/40" title="Durable background runtime"><CloudCog className="h-4 w-4 text-violet-400"/> Background</button></div></div>
+    {surface==='artifacts'&&<ArtifactsPanel onBack={()=>setSurface(null)}/>} {surface==='scratchpad'&&<ScratchpadPanel onBack={()=>setSurface(null)/>}
+    {surface==='reports'&&<DiagnosticReportsPanel onBack={()=>setSurface(null)}/>} {surface==='background'&&<div className="fixed inset-0 z-30 flex h-[100dvh] w-full flex-col bg-[#09090b] text-zinc-100"><header className="flex min-h-14 items-center gap-3 border-b border-zinc-800 bg-[#0d0d0f]/95 px-3"><button onClick={()=>setSurface(null)} className="h-9 w-9 rounded-lg text-zinc-400 hover:bg-zinc-800">←</button><div><div className="text-sm font-semibold">Background runtime</div><div className="text-[10px] text-zinc-500">Continue supported work after the page closes</div></div></header><main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"><DurableBackgroundPanel/></main></div>}
+    {surface==='google'&&<div className="fixed inset-0 z-30 flex h-[100dvh] w-full flex-col bg-[#09090b] text-zinc-100"><header className="flex min-h-14 items-center gap-3 border-b border-zinc-800 bg-[#0d0d0f]/95 px-3"><button onClick={()=>setSurface(null)} className="h-9 w-9 rounded-lg text-zinc-400 hover:bg-zinc-800" title="Close"><X className="mx-auto h-4 w-4"/></button><div><div className="text-sm font-semibold">Google Workspace</div><div className="text-[10px] text-zinc-500">Identity and least-privilege capability permissions</div></div></header><main className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"><GoogleCapabilitySettingsPanel/></main></div>}
+  </>;
 };
