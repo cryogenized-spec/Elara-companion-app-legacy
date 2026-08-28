@@ -115,6 +115,31 @@ test('recovery returns to preference #1 after cooldown', async () => {
   assert.equal(result.context.model, preferred);
 });
 
+test('resilience emits canonical request, error, cooldown, fallback and success events', async () => {
+  const events: RoutingEvent[] = [];
+  const result = await runWithModelResilience(preferred, async (model) => {
+    if (model === preferred) throw apiError('HTTP 429 rate limit');
+    return { value: 'ok' };
+  }, {
+    retryPolicy: noRetry,
+    fallbackModels: fallbacks,
+    failoverErrorCodes: ['API_RATE_LIMIT_RPM_429'],
+    telemetry: (event) => events.push({
+      ...event,
+      id: `test_${events.length}`,
+      timestamp: events.length + 1,
+      timezone: 'Africa/Johannesburg',
+      sessionId: 'test',
+    } as RoutingEvent),
+  }, store());
+  assert.equal(result.context.model, fallbacks[0]);
+  assert.deepEqual(events.map((event) => event.eventType), ['request', 'error', 'cooldown', 'fallback', 'request', 'success']);
+  assert.equal(events[1].errorClassification, 'API_RATE_LIMIT_RPM_429');
+  assert.equal(events[3].destinationModel, fallbacks[0]);
+  assert.equal(events[4].preferenceRank, 2);
+  assert.equal(events[5].success, true);
+});
+
 test('routing telemetry can reconstruct the proof path and keeps secrets out of structured events', () => {
   const events: RoutingEvent[] = [
     { id: '1', timestamp: 1, timezone: 'Africa/Johannesburg', sessionId: 's', requestId: 'r', preferredModel: preferred, attemptedModel: preferred, preferenceRank: 1, attemptNumber: 1, provider: 'gemini', eventType: 'request' },
