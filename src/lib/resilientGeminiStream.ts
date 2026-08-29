@@ -132,13 +132,21 @@ export async function runResilientGeminiStreamTurn(
       let emittedOutput = false;
       const functionCalls: any[] = [];
       const modelParts: any[] = [];
-      const responseStream: any = await options.ai.models.generateContentStream({
-        model,
-        contents: options.contents,
-        config: options.buildConfig(model),
-      });
       const requestConfig = options.buildConfig(model);
+
       emitGeminiForensics('request', model, options.contents, requestConfig);
+
+      let responseStream: any;
+      try {
+        responseStream = await options.ai.models.generateContentStream({
+          model,
+          contents: options.contents,
+          config: requestConfig,
+        });
+      } catch (error) {
+        emitGeminiForensics('request-failed-before-stream', model, options.contents, requestConfig, error);
+        throw error;
+      }
 
       const batcher = createChunkBatcher(options.onChunk);
 
