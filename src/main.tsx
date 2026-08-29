@@ -11,6 +11,7 @@ import { ComposerDraftRecovery } from './components/ComposerDraftRecovery';
 import { ComposerMarkdownAnchor } from './components/ComposerMarkdownAnchor';
 import { ComposerOutboxRecovery } from './components/ComposerOutboxRecovery';
 import { RoutingDiagnosticsPanel } from './components/RoutingDiagnosticsPanel';
+import { ComposerModelSelectorBridge } from './components/ComposerModelSelectorBridge';
 import { installBackgroundSafeAbortBoundary } from './lib/backgroundSafeRuntime';
 import { installMobileViewportSync } from './lib/mobileViewport';
 import './index.css';
@@ -34,5 +35,6 @@ createRoot(document.getElementById('root')!).render(
     <ComposerMarkdownAnchor />
     <ComposerOutboxRecovery />
     <RoutingDiagnosticsPanel />
+    <ComposerModelSelectorBridge />
   </StrictMode>,
 );
