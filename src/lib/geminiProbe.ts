@@ -18,15 +18,29 @@ export interface GeminiMinimalProbeResult {
   };
 }
 
+export interface GeminiGenerateStreamClient {
+  models: {
+    generateContentStream(request: {
+      model: string;
+      contents: Array<{ role: 'user'; parts: Array<{ text: string }> }>;
+      config: Record<string, never>;
+    }): Promise<AsyncIterable<{ text?: string }>>;
+  };
+}
+
 /**
  * Phase 2 forensic probe. This deliberately bypasses Elara's routing, tools,
- * thinking configuration, workspace context, and history. It is intended to
- * answer one question: can this API key successfully make the smallest
- * possible Gemini request from the browser environment?
+ * thinking configuration, workspace context, and history. It answers one
+ * question: can this API key make the smallest possible Gemini request from
+ * the browser environment?
  */
-export async function runGeminiMinimalProbe(apiKey: string, model: string): Promise<GeminiMinimalProbeResult> {
+export async function runGeminiMinimalProbe(
+  apiKey: string,
+  model: string,
+  clientFactory: (key: string) => GeminiGenerateStreamClient = (key) => new GoogleGenAI({ apiKey: key }) as unknown as GeminiGenerateStreamClient,
+): Promise<GeminiMinimalProbeResult> {
   const preferredModel = normalizeModel(model);
-  const config = {};
+  const config: Record<string, never> = {};
   const requestShape = {
     contentsCount: 1,
     configKeys: [],
@@ -39,7 +53,7 @@ export async function runGeminiMinimalProbe(apiKey: string, model: string): Prom
   const startedAt = Date.now();
   try {
     if (!apiKey || !apiKey.trim()) throw new Error('No Gemini API key is configured.');
-    const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+    const ai = clientFactory(apiKey.trim());
     const response = await ai.models.generateContentStream({
       model: preferredModel,
       contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
