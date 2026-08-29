@@ -8,13 +8,20 @@ export interface GeminiMinimalProbeResult {
   latencyMs: number;
   responseText?: string;
   error?: ClassifiedApiError;
+  failureStage?: 'before-stream' | 'after-stream';
   requestShape: {
     contentsCount: number;
+    contentRole: 'user';
+    messageText: 'hello';
     configKeys: string[];
     hasSystemInstruction: boolean;
     hasSafetySettings: boolean;
     hasThinkingConfig: boolean;
     hasTools: boolean;
+    hasHistory: boolean;
+    hasWorkspace: boolean;
+    hasGoogleOAuth: boolean;
+    usesResilience: false;
   };
 }
 
@@ -22,17 +29,17 @@ export interface GeminiGenerateStreamClient {
   models: {
     generateContentStream(request: {
       model: string;
-      contents: Array<{ role: 'user'; parts: Array<{ text: string }> }>;
-      config: Record<string, never>;
+      contents: Array<{ role: 'user'; parts: Array<{ text: 'hello' }> }>;
+      config?: Record<string, never>;
     }): Promise<AsyncIterable<{ text?: string }>>;
   };
 }
 
 /**
  * Phase 2 forensic probe. This deliberately bypasses Elara's routing, tools,
- * thinking configuration, workspace context, and history. It answers one
- * question: can this API key make the smallest possible Gemini request from
- * the browser environment?
+ * thinking configuration, workspace context, OAuth, history and retry policy.
+ * It answers one question: can this browser environment make the smallest
+ * possible Gemini request with the already-configured API key?
  */
 export async function runGeminiMinimalProbe(
   apiKey: string,
@@ -41,28 +48,60 @@ export async function runGeminiMinimalProbe(
 ): Promise<GeminiMinimalProbeResult> {
   const preferredModel = normalizeModel(model);
   const config: Record<string, never> = {};
-  const requestShape = {
+  const requestShape: GeminiMinimalProbeResult['requestShape'] = {
     contentsCount: 1,
+    contentRole: 'user',
+    messageText: 'hello',
     configKeys: [],
     hasSystemInstruction: false,
     hasSafetySettings: false,
     hasThinkingConfig: false,
     hasTools: false,
-  } as const;
+    hasHistory: false,
+    hasWorkspace: false,
+    hasGoogleOAuth: false,
+    usesResilience: false,
+  };
 
   const startedAt = Date.now();
+  let streamStarted = false;
+
   try {
     if (!apiKey || !apiKey.trim()) throw new Error('No Gemini API key is configured.');
     const ai = clientFactory(apiKey.trim());
-    const response = await ai.models.generateContentStream({
-      model: preferredModel,
-      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
-      config,
-    });
+    let response: AsyncIterable<{ text?: string }>;
+    try {
+      response = await ai.models.generateContentStream({
+        model: preferredModel,
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        config,
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        model: preferredModel,
+        latencyMs: Date.now() - startedAt,
+        error: classifyApiError(error, preferredModel),
+        failureStage: 'before-stream',
+        requestShape,
+      };
+    }
 
+    streamStarted = true;
     let text = '';
-    for await (const chunk of response) {
-      if (chunk.text) text += chunk.text;
+    try {
+      for await (const chunk of response) {
+        if (chunk.text) text += chunk.text;
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        model: preferredModel,
+        latencyMs: Date.now() - startedAt,
+        error: classifyApiError(error, preferredModel),
+        failureStage: streamStarted ? 'after-stream' : 'before-stream',
+        requestShape,
+      };
     }
 
     return {
@@ -78,6 +117,7 @@ export async function runGeminiMinimalProbe(
       model: preferredModel,
       latencyMs: Date.now() - startedAt,
       error: classifyApiError(error, preferredModel),
+      failureStage: streamStarted ? 'after-stream' : 'before-stream',
       requestShape,
     };
   }
