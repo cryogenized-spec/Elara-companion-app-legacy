@@ -86,14 +86,6 @@ function createChunkBatcher(onChunk: (chunk: StreamChunk) => void) {
   return { enqueue, flush };
 }
 
-function buildCompatibilityConfig(config: any): any {
-  if (!config || typeof config !== 'object') return config;
-  const compatibility = { ...config };
-  delete compatibility.tools;
-  delete compatibility.thinkingConfig;
-  return compatibility;
-}
-
 function fingerprintConfig(config: any): Record<string, unknown> {
   return {
     configKeys: config && typeof config === 'object' ? Object.keys(config).sort() : [],
@@ -140,44 +132,13 @@ export async function runResilientGeminiStreamTurn(
       let emittedOutput = false;
       const functionCalls: any[] = [];
       const modelParts: any[] = [];
-      let responseStream: any;
+      const responseStream: any = await options.ai.models.generateContentStream({
+        model,
+        contents: options.contents,
+        config: options.buildConfig(model),
+      });
       const requestConfig = options.buildConfig(model);
       emitGeminiForensics('request', model, options.contents, requestConfig);
-
-      try {
-        responseStream = await options.ai.models.generateContentStream({
-          model,
-          contents: options.contents,
-          config: requestConfig,
-        });
-      } catch (error) {
-        emitGeminiForensics('initial-request-failed', model, options.contents, requestConfig, error);
-        const classified = classifyApiError(error, model);
-        const compatibilityConfig = buildCompatibilityConfig(requestConfig);
-
-        try {
-          emitGeminiForensics('compatibility-request', model, options.contents, compatibilityConfig);
-          responseStream = await options.ai.models.generateContentStream({
-            model,
-            contents: options.contents,
-            config: compatibilityConfig,
-          });
-          console.warn('Gemini request used compatibility envelope after initial request failure.', {
-            model,
-            code: classified.code,
-            status: classified.httpStatus,
-          });
-        } catch (compatibilityError) {
-          emitGeminiForensics('compatibility-request-failed', model, options.contents, compatibilityConfig, compatibilityError);
-          const fallback = classifyApiError(compatibilityError, model);
-          throw Object.assign(new Error(fallback.message), {
-            apiError: {
-              ...fallback,
-              rawMessage: `Initial request: ${classified.rawMessage} | Compatibility request: ${fallback.rawMessage}`,
-            },
-          });
-        }
-      }
 
       const batcher = createChunkBatcher(options.onChunk);
 
