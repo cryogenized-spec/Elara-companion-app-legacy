@@ -23,15 +23,21 @@ test('Gemini minimal probe sends only model, hello content, and empty config', a
   });
   assert.deepEqual(result.requestShape, {
     contentsCount: 1,
+    contentRole: 'user',
+    messageText: 'hello',
     configKeys: [],
     hasSystemInstruction: false,
     hasSafetySettings: false,
     hasThinkingConfig: false,
     hasTools: false,
+    hasHistory: false,
+    hasWorkspace: false,
+    hasGoogleOAuth: false,
+    usesResilience: false,
   });
 });
 
-test('Gemini minimal probe preserves the raw provider failure classification', async () => {
+test('Gemini minimal probe classifies a pre-stream provider failure without losing status or message', async () => {
   const result = await runGeminiMinimalProbe('test-key', 'gemini-3.7-flash', () => ({
     models: {
       async generateContentStream() {
@@ -41,7 +47,26 @@ test('Gemini minimal probe preserves the raw provider failure classification', a
   }));
 
   assert.equal(result.ok, false);
+  assert.equal(result.failureStage, 'before-stream');
   assert.equal(result.error?.httpStatus, 403);
   assert.equal(result.error?.code, 'API_FORBIDDEN_403');
   assert.match(result.error?.rawMessage || '', /permission denied/i);
+});
+
+test('Gemini minimal probe identifies a stream-time failure separately', async () => {
+  const result = await runGeminiMinimalProbe('test-key', 'gemini-3.7-flash', () => ({
+    models: {
+      async generateContentStream() {
+        return (async function* () {
+          yield { text: 'partial' };
+          throw new Error('HTTP 500 stream broke');
+        })();
+      },
+    },
+  }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.failureStage, 'after-stream');
+  assert.equal(result.error?.httpStatus, 500);
+  assert.equal(result.error?.code, 'SERVER_ERROR_500');
 });
