@@ -76,8 +76,9 @@ export const ComposerModelSelectorBridge: React.FC = () => {
           setSettings(next);
           void setDbSettings(next).then(() => window.location.reload());
         }} />
-        <button type="button" disabled={streaming || probeBusy} onClick={() => void runProbe()} title="Test Gemini Connection" aria-label="Test Gemini Connection" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-950/90 text-zinc-400 shadow-lg backdrop-blur-sm transition hover:border-amber-600/60 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
-          {probeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bug className="h-4 w-4" />}
+        <button type="button" disabled={streaming || probeBusy} onClick={() => void runProbe()} title="Test Gemini Connection" aria-label="Test Gemini Connection" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-950/90 px-2.5 text-[10px] font-semibold text-zinc-400 shadow-lg backdrop-blur-sm transition hover:border-amber-600/60 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
+          {probeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bug className="h-3.5 w-3.5" />}
+          <span>Test</span>
         </button>
       </div>
       {probeResult && <div className="fixed bottom-[5.25rem] right-3 z-[180] w-[min(94vw,620px)] rounded-2xl border border-zinc-700 bg-zinc-950/98 p-4 text-zinc-200 shadow-2xl backdrop-blur-xl sm:right-5">
